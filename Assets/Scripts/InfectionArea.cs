@@ -9,6 +9,8 @@ public class InfectionArea : MonoBehaviour {
     public float lifeTime = 1;
     public int infection = 0;
 
+	public Renderer renderer = null;
+
     #endregion
 
     #region protected variables
@@ -27,6 +29,11 @@ public class InfectionArea : MonoBehaviour {
 	void Start () 
     {
         charactersInfected.Clear();
+
+		transform.localScale = new Vector3(0,0,0);
+		Color color = renderer.material.color;
+		color.a = 0;
+		renderer.material.color = color;
 	}
 	
 	// Update is called once per frame
@@ -39,8 +46,11 @@ public class InfectionArea : MonoBehaviour {
             return;
         }
 
-        scale = (lifeTime-tick) / lifeTime;
+        scale = tick / lifeTime;
         transform.localScale = new Vector3(scale,1,scale);
+		Color color = renderer.material.color;
+		color.a = 1 - scale;
+		renderer.material.color = color;
 	}
 
     void OnTriggerStay(Collider _collider)

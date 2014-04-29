@@ -28,6 +28,7 @@ public class Character : MonoBehaviour
     public Attributes attributes;
 
     public InfectionArea infectionAreaPrefab;
+	public GameObject deathExplosionPrefab;
 
 	#endregion
 
@@ -39,7 +40,11 @@ public class Character : MonoBehaviour
     protected Vector3 desiredPosition;
     protected Vector3 currentVelocity;
 
+	protected Vector3 lastPosition;
+
     BoxCollider currentArea = null;
+
+	protected float tick = 0;
 
     #endregion
 
@@ -53,57 +58,63 @@ public class Character : MonoBehaviour
         aiDelay = 0;
         DecideNextState();
         transform.position = desiredPosition;
+		lastPosition = transform.position;
 	}
 	
 	// Update is called once per frame
 	void Update () 
     {
-        Vector3 dir = desiredPosition - transform.position;
-        float maxDeltaPos = Mathf.Min(dir.magnitude / Time.deltaTime, GameManager.instance.characterMoveSpeed);
-        this.rigidbody.velocity = dir.normalized * maxDeltaPos;
-        if (this.rigidbody.velocity.sqrMagnitude > 0.5f)
-        {
-            Quaternion desiredRot = Quaternion.LookRotation(this.rigidbody.velocity.normalized);
-            this.transform.rotation = Quaternion.RotateTowards(this.transform.rotation, desiredRot, 360*Time.deltaTime);
-        }
+		if(Input.GetKeyDown(KeyCode.Escape))
+		{
+			Application.LoadLevel(Application.loadedLevel);
+		}
 
-        isMoving = dir.magnitude > 2f;
-        charAnimator.SetBool("isMoving", isMoving);
+		tick += Time.deltaTime;
 
         switch (state)
         {
-            case State.SNEEZING:
-            {
-                break;
-            }
-            case State.DANCING:
-            {
-                if(!isMoving)
-                {
-                    ApplyModifiers(GameManager.instance.dancingModifiers);
-                }
-                break;
-            }
-            case State.DRINKING:
-            {
-                if(!isMoving)
-                {
-                    ApplyModifiers(GameManager.instance.drinkingModifiers);
-                }
-                break;
-            }
-            case State.IDLING:
-            {
-                if(!isMoving)
-                {
-                    ApplyModifiers(GameManager.instance.idleModifiers);
-                }
-                break;
-            }
-            case State.DEAD:
-            {
-                break;
-            }
+	    case State.SNEEZING:
+	    {
+			if(tick < 1.0f)
+			{
+				this.rigidbody.velocity = Vector3.zero;
+				return;
+			}
+	        break;
+	    }
+	    case State.DANCING:
+	    {
+	        if(!isMoving)
+	        {
+	            ApplyModifiers(GameManager.instance.dancingModifiers);
+	        }
+	        break;
+	    }
+	    case State.DRINKING:
+	    {
+	        if(!isMoving)
+	        {
+	            ApplyModifiers(GameManager.instance.drinkingModifiers);
+	        }
+	        break;
+	    }
+	    case State.IDLING:
+	    {
+	        if(!isMoving)
+	        {
+	            ApplyModifiers(GameManager.instance.idleModifiers);
+	        }
+	        break;
+	    }
+	    case State.DEAD:
+	    {
+			tick += Time.deltaTime;
+			if(tick > 0.2f)
+			{
+
+			}
+	        break;
+	    }
         }
 
         if (!isMoving)
@@ -117,89 +128,97 @@ public class Character : MonoBehaviour
         }
         DecideNextState();
 
-        /*
-        //if(!isMoving)
-        {
-            float minDistSq = float.MaxValue;
-            Character closestCharacter = null;
-            for(int i = 0; i < GameManager.instance.characters.Count; i++)
-            {
-                Character character = GameManager.instance.characters[i];
-                if(character != this)
-                {
-                    float distSq = (character.transform.position - this.transform.position).sqrMagnitude;
-                    if(distSq < minDistSq)
-                    {
-                        minDistSq = distSq;
-                        closestCharacter = character;
-                    }
-                    float dist = dir.magnitude;
-                    if(dist < GameManager.instance.minCharacterDist)
-                    {
-                        //desiredPosition = transform.position + dir.normalized * GameManager.instance.minCharacterDist;
-                        this.transform.position = dir.normalized * GameManager.instance.minCharacterDist;
-                    }
-                    else if(dist > GameManager.instance.maxCharacterDist)
-                    {
-                        //desiredPosition = transform.position + dir.normalized * GameManager.instance.maxCharacterDist;
-                    }
-                }
-            }
-        }*/
+		//handle movement
+		this.rigidbody.mass = isMoving ? 1.0f : 0.3f;
+		Vector3 dir = desiredPosition - transform.position;
+		float maxDeltaPos = Mathf.Min(dir.magnitude / Time.deltaTime, GameManager.instance.characterMoveSpeed);
+		this.rigidbody.velocity = dir.normalized * maxDeltaPos;
+		
+		if (maxDeltaPos > 0.5f)
+		{
+			Quaternion desiredRot = Quaternion.LookRotation(this.rigidbody.velocity.normalized);
+			this.transform.rotation = Quaternion.RotateTowards(this.transform.rotation, desiredRot, 360*Time.deltaTime);
+		}
+		
+		if(isMoving && dir.magnitude < 0.5f)
+		{
+			isMoving = false;
+			charAnimator.SetBool("isMoving", false);
+			charAnimator.SetBool("isDancing", state == State.DANCING);
+			charAnimator.SetBool("isDrinking", state == State.DRINKING);
+			charAnimator.SetBool("isIdle", state == State.IDLING);
+		}
+		
+		lastPosition = transform.position;
 	}
-
+	
 	#endregion
 
     #region public methods
 
     public void Cough()
     {
-        float coughInfection = infection;
-        Infect(-infection);
+		//if(state != State.SNEEZING)
+		{
+	        float coughInfection = infection;
+	        Infect(-1);
 
-        GameObject gobj = GameObject.Instantiate(infectionAreaPrefab.gameObject) as GameObject;
-        InfectionArea infectionArea = gobj.GetComponent<InfectionArea>();
-        infectionArea.lifeTime = 0.5f;
-        infectionArea.infection = 1;
-        infectionArea.owner = this;
-        gobj.transform.position = this.transform.position + new Vector3(0,0.5f,0);
+	        GameObject gobj = GameObject.Instantiate(infectionAreaPrefab.gameObject) as GameObject;
+	        InfectionArea infectionArea = gobj.GetComponent<InfectionArea>();
+	        infectionArea.lifeTime = 0.5f;
+	        infectionArea.infection = 1;
+	        infectionArea.owner = this;
+	        gobj.transform.position = this.transform.position + new Vector3(0,0.5f,0);
 
+			charAnimator.SetTrigger("triggerSneeze");
 
+			SetState(State.SNEEZING);
+		}
     }
 
     public void Infect(int infectionModifier)
     {
-        //quick hack to catch null exception
-        Renderer ourRenderer = GetComponentInChildren<Renderer>();
-        if (ourRenderer)
-        {
-            infection += infectionModifier;
+		if(state != State.DEAD)
+		{
+	        //quick hack to catch null exception
+	        Renderer ourRenderer = GetComponentInChildren<Renderer>();
+	        if (ourRenderer)
+	        {
+	            infection += infectionModifier;
 
-            Debug.Log("Infecting " + this.name + " (+" + infectionModifier + ") = " + infection);
-            if (infection == 0)
-            {
-                ourRenderer.material.color = new Color(1, 1, 1);
-            } else if (infection == 1)
-            {
-                ourRenderer.material.color = new Color(1, 1, 0);
-            } else if (infection == 2)
-            {
-                ourRenderer.material.color = new Color(1, 0, 0);
-            } else if (infection >= 3)
-            {
-                //explode!
-                Cough();
-                gameObject.SetActive(false);
-            }
-        }
+	            Debug.Log("Infecting " + this.name + " (+" + infectionModifier + ") = " + infection);
+	            if (infection == 0)
+	            {
+	                ourRenderer.material.color = new Color(1, 1, 1);
+	            } else if (infection == 1)
+	            {
+	                ourRenderer.material.color = new Color(0, 1, 0);
+	            } else if (infection == 2)
+	            {
+	                ourRenderer.material.color = new Color(1, 0, 0);
+	            } else if (infection >= 3)
+	            {
+	                //explode!
+	                Cough();
+					GameObject gobj = GameObject.Instantiate(deathExplosionPrefab) as GameObject;
+					gobj.transform.position = this.transform.position;
+					Destroy(gameObject);
+				}
+	        }
+		}
     }
 
     public void DecideNextState()
     {
-        if (attributes.hydration < 0.2f)
-        {
-            SetState(State.DRINKING);
-        } else if ((attributes.energy + attributes.confidence) * 0.5f > 0.5f)
+		if(aiDelay > 0)
+		{
+			return;
+		}
+
+		if (attributes.hydration < 0.2f && GameManager.instance.characters.Count > 10)
+		{
+			SetState(State.DRINKING);
+        } else if ((attributes.energy + attributes.confidence) * 0.5f > 0.5f || infection >= 2 || GameManager.instance.characters.Count < 20)
         {
             SetState(State.DANCING);
         } else
@@ -221,6 +240,9 @@ public class Character : MonoBehaviour
         float zPos = Random.Range(currentArea.bounds.min.z, currentArea.bounds.max.z);
         
         desiredPosition = new Vector3(xPos, 0, zPos);
+
+		charAnimator.SetBool("isMoving", true);
+		isMoving = true;
     }
 
     void ApplyModifiers(Attributes _mod)
@@ -233,12 +255,8 @@ public class Character : MonoBehaviour
 
 	void SetState(State _newState)
 	{
-        if (aiDelay > 0)
-        {
-			return;
-        }
-
         aiDelay = Random.Range(0.5f, 5f);
+		tick = 0;
 
         if (currentArea && state == _newState)
         {
@@ -247,36 +265,37 @@ public class Character : MonoBehaviour
         {
             switch (_newState)
             {
-                case State.SNEEZING:
-                {
+	        case State.SNEEZING:
+	        {
 
-                    break;
-                }
-                case State.DANCING:
-                {
-                    MoveToArea(GameManager.instance.danceAreas);
-                    break;
-                }
-                case State.DRINKING:
-                {
-                    MoveToArea(GameManager.instance.drinkAreas);
-                    break;
-                }
-                case State.IDLING:
-                {
-                    if (attributes.confidence < 0.2f)
-                    {
-                        MoveToArea(GameManager.instance.unsocialAreas);
-                    } else
-                    {
-                        MoveToArea(GameManager.instance.socialAreas);
-                    }
-                    break;
-                }
-                case State.DEAD:
-                {
-                    break;
-                }
+	            break;
+	        }
+	        case State.DANCING:
+	        {
+	            MoveToArea(GameManager.instance.danceAreas);
+	            break;
+	        }
+	        case State.DRINKING:
+	        {
+	            MoveToArea(GameManager.instance.drinkAreas);
+	            break;
+	        }
+	        case State.IDLING:
+	        {
+	            if (attributes.confidence < 0.2f)
+	            {
+	                MoveToArea(GameManager.instance.unsocialAreas);
+	            } else
+	            {
+	                MoveToArea(GameManager.instance.socialAreas);
+	            }
+	            break;
+	        }
+	        case State.DEAD:
+	        {
+				charAnimator.SetTrigger("triggerDeath");
+	            break;
+	        }
             }
         }
 

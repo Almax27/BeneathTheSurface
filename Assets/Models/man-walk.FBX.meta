@@ -1,7 +1,7 @@
 fileFormatVersion: 2
 guid: dc3af9924db7340589867aadd5d00073
 ModelImporter:
-  serializedVersion: 16
+  serializedVersion: 15
   fileIDToRecycleName:
     100000: hero_bn_arm_top_L
     100002: hero_bn_arm_top_R
@@ -59,7 +59,7 @@ ModelImporter:
       cycleOffset: 0
       loop: 0
       loopTime: 1
-      loopBlend: 0
+      loopBlend: 1
       loopBlendOrientation: 0
       loopBlendPositionY: 0
       loopBlendPositionXZ: 0
@@ -132,5 +132,4 @@ ModelImporter:
     rootMotionBoneName: hero_bn_root
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   animationType: 2
-  additionalBone: 0
   userData: 

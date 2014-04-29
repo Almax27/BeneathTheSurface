@@ -11,6 +11,29 @@ public class GameManager : MonoBehaviour
 
     #region public variables
 
+	public enum GameState
+	{
+		TITLE,
+		GAME,
+		WIN,
+		FAILURE
+	}
+
+	public GameState gameState = GameState.TITLE;
+
+	public GUITexture titleGUI;
+	public GUITexture winGUI;
+	public GUITexture failureGUI;
+
+	public AudioSource popSoundPrefab;
+	public AudioSource sneezeSoundPrefab;
+
+	public TextMesh scoreText;
+	public TextMesh timerText;
+
+	public float gameTime = 60;
+	public float timer;
+
     public Character characterPrefab;
     public int numberOfCharacters;
 
@@ -36,7 +59,7 @@ public class GameManager : MonoBehaviour
 
     #region protected vairables
 
-    public GameObject characterContainer;
+	protected GameObject characterContainer;
 
     #endregion
 
@@ -57,53 +80,79 @@ public class GameManager : MonoBehaviour
 	void Start () 
     {
         characterContainer = new GameObject("Characters");
+		scoreText.text = "0/" + numberOfCharacters;
+		SetGameState(GameState.TITLE);
 	}
 	
 	// Update is called once per frame
 	void Update () 
     {
-        //build characters
-        while (characters.Count < numberOfCharacters)
-        {
-            GameObject gobj = GameObject.Instantiate(characterPrefab.gameObject) as GameObject;
-            gobj.transform.parent = characterContainer.transform;
-            Character character = gobj.GetComponent<Character>();
-            characters.Insert(0, character);
-            character.name = "Character " + (characters.Count-1);
+		switch(gameState)
+		{
+		case GameState.TITLE:
+		{
+			if (Input.GetMouseButtonDown(0))
+			{
+				SetGameState(GameState.GAME);
+			}
+			break;
+		}
+		case GameState.GAME:
+		{
+			int infected = 0;
+			for (int i = 0; i < characters.Count; i++)
+			{
+				if(characters[i] == null)
+				{
+					GameObject.Instantiate(popSoundPrefab);
+					characters.RemoveAt(i--);
+					continue;
+				}
+				//end game catch
+				if(GameManager.instance.characters.Count <= 3)
+				{
+					characters[i].Infect(3);
+				}
+				if(characters[i].infection > 0)
+				{
+					infected++;
+				}
+			}
 
-            //on creation of the first character
-            if(characters.Count == 1)
-            {
-                character.Infect(1);
-            }
-        }
-        //destroy characters
-        while (characters.Count > numberOfCharacters)
-        {
-            GameObject.Destroy(characters[0].gameObject);
-            characters.RemoveAt(0);
-        }
+			if (Input.GetMouseButtonDown(0))
+	        {
+	            TryCough(Input.mousePosition);
+	        }
 
-        if (Input.GetMouseButtonDown(0))
-        {
-            TryCough(Input.mousePosition);
-        }
+			//handle fail
+			timer += Time.deltaTime;
+			if(timer >= gameTime || (infected == 0 && FindObjectsOfType(typeof(InfectionArea)).Length == 0))
+			{
+				timer = gameTime;
+				SetGameState(GameState.FAILURE);
+			}
+			timerText.text = (gameTime - timer).ToString("0.0s");
 
-        int infected = 0;
-        for (int i = 0; i < characters.Count; i++)
-        {
-            if(characters[i].infection > 0)
-            {
-                infected++;
-            }
-        }
-        if(infected == 0)
-        {
-            if(FindObjectsOfType(typeof(InfectionArea)).Length > 0)
-            {
-               // Application.LoadLevel(Application.loadedLevel);
-            }
-        }
+			//handle win
+			if(characters.Count == 0 )
+	        {
+				SetGameState(GameState.WIN);
+	        }
+			scoreText.text = characters.Count + "/" + numberOfCharacters;
+
+			break;
+		}
+		case GameState.WIN:
+		case GameState.FAILURE:
+		{
+			if (Input.GetMouseButtonDown(0))
+			{
+				//SetGameState(GameState.TITLE);
+				Application.LoadLevel(Application.loadedLevel);
+			}
+			break;
+		}
+		}
 	}
 
     #endregion
@@ -123,6 +172,7 @@ public class GameManager : MonoBehaviour
             if(character)
             {
                 character.Cough();
+				GameObject.Instantiate(sneezeSoundPrefab);
             }
         }
     }
@@ -146,6 +196,49 @@ public class GameManager : MonoBehaviour
         }
         return closestCharacter;
     }
+
+	void SetGameState(GameState _newState)
+	{
+		titleGUI.gameObject.SetActive(_newState == GameState.TITLE);
+		winGUI.gameObject.SetActive(_newState == GameState.WIN);
+		failureGUI.gameObject.SetActive(_newState == GameState.FAILURE);
+
+		switch(_newState)
+		{
+		case GameState.TITLE:
+		{
+			while (characters.Count < numberOfCharacters)
+			{
+				GameObject gobj = GameObject.Instantiate(characterPrefab.gameObject) as GameObject;
+				gobj.transform.parent = characterContainer.transform;
+				Character character = gobj.GetComponent<Character>();
+				characters.Insert(0, character);
+				character.name = "Character " + (characters.Count-1);
+				
+				//on creation of the first character
+				if(characters.Count == 1)
+				{
+					character.Infect(1);
+				}
+			}
+			timer = 0;
+			break;
+		}
+		case GameState.GAME:
+		{
+			break;
+		}
+		case GameState.WIN:
+		{
+			break;
+		}
+		case GameState.FAILURE:
+		{
+			break;
+		}
+		}
+		gameState = _newState;
+	}
 
     #endregion
 }
